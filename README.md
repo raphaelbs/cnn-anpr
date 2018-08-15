@@ -1,3 +1,6 @@
+# Note
+I modify the gen.py use the real plate(Taiwan) to make the more robust fake plate image data.
+And it will auto label and write the .json file for labelme(https://github.com/wkentaro/labelme) tool
 # Deep ANPR
 
 Using neural networks to build an automatic number plate recognition system.
