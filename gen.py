@@ -32,14 +32,12 @@ __all__ = (
     'generate_ims',
 )
 
-import matplotlib.pyplot as plt
+
 import itertools
 import math
 import os
 import random
 import sys
-import json
-import re
 
 import cv2
 import numpy
@@ -51,15 +49,15 @@ from PIL import ImageFont
 import common
 
 FONT_DIR = "./fonts"
-FONT_HEIGHT = 96  # Pixel size to which the chars are resized
+FONT_HEIGHT = 32  # Pixel size to which the chars are resized
 
-OUTPUT_SHAPE = (300, 300)
+OUTPUT_SHAPE = (64, 128)
 
 CHARS = common.CHARS + " "
 
 
 def make_char_ims(font_path, output_height):
-    font_size = output_height * 8
+    font_size = output_height * 4
 
     font = ImageFont.truetype(font_path, font_size)
 
@@ -99,15 +97,13 @@ def euler_to_mat(yaw, pitch, roll):
 
 
 def pick_colors():
-    # first = True
-    # while first or plate_color - text_color < 0.3:
-    #     text_color = random.random()
-    #     plate_color = random.random()
-    #     if text_color > plate_color:
-    #         text_color, plate_color = plate_color, text_color
-    #     first = False
-    text_color=0.0
-    plate_color=1.0
+    first = True
+    while first or plate_color - text_color < 0.3:
+        text_color = random.random()
+        plate_color = random.random()
+        if text_color > plate_color:
+            text_color, plate_color = plate_color, text_color
+        first = False
     return text_color, plate_color
 
 
@@ -116,28 +112,24 @@ def make_affine_transform(from_shape, to_shape,
                           scale_variation=1.0,
                           rotation_variation=1.0,
                           translation_variation=1.0):
+    out_of_bounds = False
+
     from_size = numpy.array([[from_shape[1], from_shape[0]]]).T
     to_size = numpy.array([[to_shape[1], to_shape[0]]]).T
 
-    out_of_bounds = True
-    while(out_of_bounds):
-        scale = random.uniform((min_scale + max_scale) * 0.5 -
-                               (max_scale - min_scale) * 0.5 * scale_variation,
-                               (min_scale + max_scale) * 0.5 +
-                               (max_scale - min_scale) * 0.5 * scale_variation)
-        if scale > max_scale or scale < min_scale:
-            out_of_bounds = True
-        else:
-            out_of_bounds = False
-
+    scale = random.uniform((min_scale + max_scale) * 0.5 -
+                           (max_scale - min_scale) * 0.5 * scale_variation,
+                           (min_scale + max_scale) * 0.5 +
+                           (max_scale - min_scale) * 0.5 * scale_variation)
+    if scale > max_scale or scale < min_scale:
+        out_of_bounds = True
     roll = random.uniform(-0.3, 0.3) * rotation_variation
     pitch = random.uniform(-0.2, 0.2) * rotation_variation
     yaw = random.uniform(-1.2, 1.2) * rotation_variation
 
     # Compute a bounding box on the skewed input image (`from_shape`).
     M = euler_to_mat(yaw, pitch, roll)[:2, :2]
-    h = from_shape[0]
-    w = from_shape[1]
+    h, w = from_shape
     corners = numpy.matrix([[-w, +w, -w, +w],
                             [-h, -h, +h, +h]]) * 0.5
     skewed_size = numpy.array(numpy.max(M * corners, axis=1) -
@@ -149,15 +141,10 @@ def make_affine_transform(from_shape, to_shape,
 
     # Set the translation such that the skewed and scaled image falls within
     # the output shape's bounds.
-    out_of_bounds = True
-    while(out_of_bounds):
-        trans = (numpy.random.random((2,1)) - 0.5) * translation_variation
-        trans = ((2.0 * trans) ** 5.0) / 2.0
-        if numpy.any(trans < -0.5) or numpy.any(trans > 0.5):
-            out_of_bounds = True
-        else:
-            out_of_bounds = False
-
+    trans = (numpy.random.random((2,1)) - 0.5) * translation_variation
+    trans = ((2.0 * trans) ** 5.0) / 2.0
+    if numpy.any(trans < -0.5) or numpy.any(trans > 0.5):
+        out_of_bounds = True
     trans = (to_size - skewed_size * scale) * trans
 
     center_to = to_size / 2.
@@ -167,7 +154,7 @@ def make_affine_transform(from_shape, to_shape,
     M *= scale
     M = numpy.hstack([M, trans + center_to - M * center_from])
 
-    return M
+    return M, out_of_bounds
 
 
 def generate_code():
@@ -184,7 +171,6 @@ def generate_code():
 
 def rounded_rect(shape, radius):
     out = numpy.ones(shape)
-
     out[:radius, :radius] = 0.0
     out[-radius:, :radius] = 0.0
     out[:radius, -radius:] = 0.0
@@ -225,12 +211,6 @@ def generate_plate(font_height, char_ims):
 
     plate = (numpy.ones(out_shape) * plate_color * (1. - text_mask) +
              numpy.ones(out_shape) * text_color * text_mask)
-    # plt.imshow(plate)
-    # plt.show()
-
-    # print(radius)
-    # plt.imshow(rounded_rect(out_shape, radius))
-    # plt.show()
 
     return plate, rounded_rect(out_shape, radius), code.replace(" ", "")
 
@@ -239,7 +219,7 @@ def generate_bg(num_bg_images):
     found = False
     while not found:
         fname = "bgs/{:08d}.jpg".format(random.randint(0, num_bg_images - 1))
-        bg = cv2.imread(fname, cv2.IMREAD_COLOR) / 255.
+        bg = cv2.imread(fname, 0) / 255.
         if (bg.shape[1] >= OUTPUT_SHAPE[1] and
             bg.shape[0] >= OUTPUT_SHAPE[0]):
             found = True
@@ -250,68 +230,31 @@ def generate_bg(num_bg_images):
 
     return bg
 
-def find_rrect(im):
-    gray = numpy.array(im, dtype=numpy.uint8)
-    gray = cv2.cvtColor(gray, cv2.COLOR_BGR2GRAY)
-    binary = numpy.uint8(gray)
-    cnts = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[1]
-    if (len(cnts) > 0):
-        pts = cv2.minAreaRect(cnts[0])
-        box = cv2.boxPoints(pts)
-        box = numpy.int0(box)
-        box[box < 0] = 0
-    else:
-        box = [[0, 0],
-               [0, 0],
-               [0, 0],
-               [0, 0]]
-    return box
-
-def generate_plate_TW():  
-    plate_name = 'EAH-7800'
-    plate = cv2.imread('plate/' + plate_name + '.jpg', cv2.IMREAD_COLOR)
-    # cv2.imshow('plate', plate)
-    # cv2.waitKey(0)
-    plate_mask = numpy.ones(plate.shape)
-
-    return plate, plate_mask, plate_name
 
 def generate_im(char_ims, num_bg_images):
     bg = generate_bg(num_bg_images)
 
-    plate, plate_mask, code = generate_plate_TW()#generate_plate(FONT_HEIGHT, char_ims)
+    plate, plate_mask, code = generate_plate(FONT_HEIGHT, char_ims)
     
-    M = make_affine_transform(
+    M, out_of_bounds = make_affine_transform(
                             from_shape=plate.shape,
                             to_shape=bg.shape,
-                            min_scale=0.15,#0.6,
-                            max_scale=0.4,#0.875,
+                            min_scale=0.6,
+                            max_scale=0.875,
                             rotation_variation=1.0,
                             scale_variation=1.5,
                             translation_variation=1.2)
-
     plate = cv2.warpAffine(plate, M, (bg.shape[1], bg.shape[0]))
     plate_mask = cv2.warpAffine(plate_mask, M, (bg.shape[1], bg.shape[0]))
 
-    rrect = find_rrect(plate_mask)
+    out = plate * plate_mask + bg * (1.0 - plate_mask)
 
-    # plate = numpy.array(plate, dtype=numpy.uint8)
-    # plate_mask = numpy.array(plate_mask, dtype=numpy.uint8)
-    # plate = cv2.cvtColor(plate, cv2.BGR)
-    # plate_mask = cv2.cvtColor(plate_mask, cv2.COLOR_GRAY2BGR)
-
-    # out = plate * plate_mask + bg * (1.0 - plate_mask)
-    out = plate/255 + bg * (1.0 - plate_mask)
-   
-    # plt.imshow(out)
-    # plt.show()
-
-    # out = cv2.resize(out, (OUTPUT_SHAPE[1], OUTPUT_SHAPE[0]))
+    out = cv2.resize(out, (OUTPUT_SHAPE[1], OUTPUT_SHAPE[0]))
 
     out += numpy.random.normal(scale=0.05, size=out.shape)
     out = numpy.clip(out, 0., 1.)
 
-    return out, code, rrect
+    return out, code, not out_of_bounds
 
 
 def load_fonts(folder_path):
@@ -338,66 +281,14 @@ def generate_ims():
     while True:
         yield generate_im(font_char_ims[random.choice(fonts)], num_bg_images)
 
-def write_json(filepath, code, points):
-    filename = re.search('test/(.*)\.', filepath).group(1)
-    data =  {
-                "imagePath": filename + ".jpg",
-                "imageData": None,
-                "flags": {},
-                "fillColor":
-                [
-                    255,
-                    0,
-                    0,
-                    128
-                ],
-                "lineColor":
-                [
-                    0,
-                    255,
-                    0,
-                    128
-                ],
-                "shapes": 
-                [
-                    {
-                        "line_color": None,
-                        "fill_color": None,
-                        "label": "plate:" + code,
-                        "points":
-                        [
-                            [
-                                int(points[0][0]),
-                                int(points[0][1])
-                            ],
-                            [
-                                int(points[1][0]),
-                                int(points[1][1])
-                            ],
-                            [
-                                int(points[2][0]),
-                                int(points[2][1])
-                            ],
-                            [
-                                int(points[3][0]),
-                                int(points[3][1])
-                            ]
-                        ]
-                    }
-                ]
-            }
-    with open('./test/' + filename + '.json', 'w') as f:
-        json.dump(data, f, indent=4)
-    f.close()
 
 if __name__ == "__main__":
     if(os.path.exists("./test") == False):
         os.mkdir("test")
     im_gen = itertools.islice(generate_ims(), int(sys.argv[1]))
-    for img_idx, (im, c, r) in enumerate(im_gen):
-        # fname = "test/{:08d}_{}_p1({},{})_p2({},{})_p3({},{})_p4({},{}).png".format(img_idx, c, r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1], r[3][0], r[3][1])
-        fname = "test/{:08d}_{}.jpg".format(img_idx, c)
-        print (fname)
+    for img_idx, (im, c, p) in enumerate(im_gen):
+        fname = "test/{:08d}_{}_{}.png".format(img_idx, c,
+                                               "1" if p else "0")
+        print fname
         cv2.imwrite(fname, im * 255.)
-        write_json(fname, c, r)
 
