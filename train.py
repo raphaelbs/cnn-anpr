@@ -54,7 +54,7 @@ def code_to_vec(p, code):
         y = numpy.zeros((len(common.CHARS),))
         y[common.CHARS.index(c)] = 1.0
         return y
-
+    code = code.replace("-", "")
     c = numpy.vstack([char_to_vec(c) for c in code])
 
     return numpy.concatenate([[1. if p else 0], c.flatten()])
@@ -64,8 +64,8 @@ def read_data(img_glob):
     for fname in sorted(glob.glob(img_glob)):
         im = cv2.imread(fname)[:, :, 0].astype(numpy.float32) / 255.
         named = fname.split("\\")[1]
-        code = named[9:12] + named[13:17]
-        p = named[18] == '1'
+        code = named[9:16]
+        p = named[17] == '1'
         yield im, code_to_vec(p, code)
 
 
@@ -112,7 +112,7 @@ def mpgen(f):
     return wrapped
         
 
-@mpgen
+# @mpgen
 def read_batches(batch_size):
     g = gen.generate_ims()
     def gen_vecs():
@@ -209,7 +209,7 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
         num_p_correct = numpy.sum(r[2] == r[3])
 
         print ("B{:3d} {:2.02f}% {:02.02f}% loss: {} "
-               "(digits: {}, presence: {}) |{}|").format(
+               "(digits: {}, presence: {}) |{}|".format(
             batch_idx,
             100. * num_correct / (len(r[0])),
             100. * num_p_correct / len(r[2]),
@@ -217,7 +217,7 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
             r[4],
             r[5],
             "".join("X "[numpy.array_equal(b, c) or (not pb and not pc)]
-                                           for b, c, pb, pc in zip(*r_short)))
+                                           for b, c, pb, pc in zip(*r_short))))
 
     def do_batch():
         sess.run(train_step,

@@ -5,3 +5,6 @@ test
 
 # python
 *.pyc
+
+# vscode
+.vscode

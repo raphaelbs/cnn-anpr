@@ -53,7 +53,7 @@ FONT_HEIGHT = 32  # Pixel size to which the chars are resized
 
 OUTPUT_SHAPE = (64, 128)
 
-CHARS = common.CHARS + " "
+CHARS = common.CHARS + "-"
 
 
 def make_char_ims(font_path, output_height):
@@ -158,11 +158,10 @@ def make_affine_transform(from_shape, to_shape,
 
 
 def generate_code():
-    return "{}{}{}{}{}{}{}{}".format(
+    return "{}{}{}{}{}{}{}".format(
         random.choice(common.LETTERS),
         random.choice(common.LETTERS),
         random.choice(common.LETTERS),
-        '-',
         random.choice(common.DIGITS),
         random.choice(common.DIGITS),
         random.choice(common.DIGITS),
@@ -191,6 +190,7 @@ def generate_plate(font_height, char_ims):
     radius = 1 + int(font_height * 0.1 * random.random())
 
     code = generate_code()
+    code = code[0:3] + '-' + code[3:7]
     text_width = sum(char_ims[c].shape[1] for c in code)
     text_width += (len(code) - 1) * spacing
 
@@ -212,7 +212,7 @@ def generate_plate(font_height, char_ims):
     plate = (numpy.ones(out_shape) * plate_color * (1. - text_mask) +
              numpy.ones(out_shape) * text_color * text_mask)
 
-    return plate, rounded_rect(out_shape, radius), code.replace(" ", "")
+    return plate, rounded_rect(out_shape, radius), code.replace(" ", "").replace("-", "")
 
 
 def generate_bg(num_bg_images):
