@@ -63,8 +63,9 @@ def code_to_vec(p, code):
 def read_data(img_glob):
     for fname in sorted(glob.glob(img_glob)):
         im = cv2.imread(fname)[:, :, 0].astype(numpy.float32) / 255.
-        code = fname.split("/")[1][9:16]
-        p = fname.split("/")[1][17] == '1'
+        named = fname.split("\\")[1]
+        code = named[9:12] + named[13:17]
+        p = named[18] == '1'
         yield im, code_to_vec(p, code)
 
 
@@ -125,10 +126,10 @@ def read_batches(batch_size):
 def get_loss(y, y_):
     # Calculate the loss from digits being incorrect.  Don't count loss from
     # digits that are in non-present plates.
-    digits_loss = tf.nn.softmax_cross_entropy_with_logits(
-                                          tf.reshape(y[:, 1:],
+    digits_loss = tf.nn.softmax_cross_entropy_with_logits_v2(
+                                        logits=tf.reshape(y[:, 1:],
                                                      [-1, len(common.CHARS)]),
-                                          tf.reshape(y_[:, 1:],
+                                        labels=tf.reshape(y_[:, 1:],
                                                      [-1, len(common.CHARS)]))
     digits_loss = tf.reshape(digits_loss, [-1, 7])
     digits_loss = tf.reduce_sum(digits_loss, 1)
@@ -136,8 +137,9 @@ def get_loss(y, y_):
     digits_loss = tf.reduce_sum(digits_loss)
 
     # Calculate the loss from presence indicator being wrong.
-    presence_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                                                          y[:, :1], y_[:, :1])
+    presence_loss = tf.nn.softmax_cross_entropy_with_logits_v2(
+                                        logits=y[:, :1],
+                                        labels=y_[:, :1])
     presence_loss = 7 * tf.reduce_sum(presence_loss)
 
     return digits_loss, presence_loss, digits_loss + presence_loss
@@ -181,7 +183,7 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
         assert len(params) == len(initial_weights)
         assign_ops = [w.assign(v) for w, v in zip(params, initial_weights)]
 
-    init = tf.initialize_all_variables()
+    init = tf.global_variables_initializer()
 
     def vec_to_plate(v):
         return "".join(common.CHARS[i] for i in v)

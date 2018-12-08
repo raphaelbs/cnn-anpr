@@ -37,7 +37,7 @@ import numpy
 DIGITS = "0123456789"
 LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 DASH = "-"
-CHARS = LETTERS + DASH + DIGITS
+CHARS = LETTERS + DIGITS
 
 def softmax(a):
     exps = numpy.exp(a.astype(numpy.float64))
