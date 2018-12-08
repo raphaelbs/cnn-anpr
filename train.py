@@ -202,8 +202,8 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
                                               r[3] < 0.5)))
         r_short = (r[0][:190], r[1][:190], r[2][:190], r[3][:190])
         for b, c, pb, pc in zip(*r_short):
-            print "{} {} <-> {} {}".format(vec_to_plate(c), pc,
-                                           vec_to_plate(b), float(pb))
+            print ("{} {} <-> {} {}".format(vec_to_plate(c), pc,
+                                           vec_to_plate(b), float(pb)))
         num_p_correct = numpy.sum(r[2] == r[3])
 
         print ("B{:3d} {:2.02f}% {:02.02f}% loss: {} "
@@ -240,9 +240,9 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
                 if batch_idx % report_steps == 0:
                     batch_time = time.time()
                     if last_batch_idx != batch_idx:
-                        print "time for 60 batches {}".format(
+                        print ("time for 60 batches {}".format(
                             60 * (last_batch_time - batch_time) /
-                                            (last_batch_idx - batch_idx))
+                                            (last_batch_idx - batch_idx)))
                         last_batch_idx = batch_idx
                         last_batch_time = batch_time
 
