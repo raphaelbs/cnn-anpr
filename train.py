@@ -63,7 +63,7 @@ def code_to_vec(p, code):
 def read_data(img_glob):
     for fname in sorted(glob.glob(img_glob)):
         im = cv2.imread(fname)[:, :, 0].astype(numpy.float32) / 255.
-        named = fname.split("\\")[1]
+        named = fname.split("/")[1]
         code = named[9:16]
         p = named[17] == '1'
         yield im, code_to_vec(p, code)
@@ -112,7 +112,7 @@ def mpgen(f):
     return wrapped
         
 
-# @mpgen
+@mpgen
 def read_batches(batch_size):
     g = gen.generate_ims()
     def gen_vecs():
