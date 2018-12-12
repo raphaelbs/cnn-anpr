@@ -116,7 +116,7 @@ def get_training_model():
     b_fc1 = bias_variable([2048])
 
     conv_layer_flat = tf.reshape(conv_layer, [-1, 32 * 8 * 128])
-    h_fc1 = tf.nn.relu(tf.matmul(conv_layer_flat, W_fc1) + b_fc1)
+    h_fc1 = tf.nn.tanh(tf.matmul(conv_layer_flat, W_fc1) + b_fc1)
 
     # Output layer
     W_fc2 = weight_variable([2048, 1 + 7 * len(common.CHARS)])
